@@ -1,0 +1,53 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Subscription xmlns="http://schemas.microsoft.com/2006/03/windows/events/subscription">
+    <SubscriptionId>Scheduled Tasks</SubscriptionId>
+    <SubscriptionType>SourceInitiated</SubscriptionType>
+    <Description>Records the creation and modifications of scheduled tasks</Description>
+    <Enabled>true</Enabled>
+    <Uri>http://schemas.microsoft.com/wbem/wsman/1/windows/EventLog</Uri>
+    <ConfigurationMode>MinLatency</ConfigurationMode>
+    <Query><![CDATA[
+<QueryList>
+  <!-- The logs generated from Audit Other Object Access Events includes better scheduled task creation information than Microsoft-Windows-TaskScheduler/Operational -->
+  <Query Id="0" Path="Security">
+      <Select Path="Security">
+      <!-- Scheduled task created, modified, deleted, disabled, enabled --> 
+      *[System[(EventID=4698 or EventID=4702 or EventID=4699 or EventID=4701 or EventID=4700)]]
+      </Select>
+      
+      <Suppress Path="Security">
+      *[EventData[Data[@Name='SubjectUserSid']='S-1-5-18']] or *[EventData[Data[@Name='SubjectUserSid']='S-1-5-19']] or *[EventData[Data[@Name='SubjectUserSid']='S-1-5-20']]
+      </Suppress>
+  </Query>
+  
+  <!-- The default Task Scheduler events do not provide as much context, so this is disabled by default
+    Event IDs:
+    106 = Task registered
+    140 = Task Modified
+    141 = Task registered
+    142 = Task disabled  
+    
+    <Query Id="1" Path="Microsoft-Windows-TaskScheduler/Operational">
+       <Select Path="Microsoft-Windows-TaskScheduler/Operational">*[System[(EventID=106 or EventID=141 or EventID=142)]]</Select>
+    </Query>
+  
+    <Query Id="2" Path="Microsoft-Windows-TaskScheduler/Operational">
+    <Select Path="Microsoft-Windows-TaskScheduler/Operational">*[System[(EventID=140)]] and *[EventData[Data[@Name='UserName'] != 'NT AUTHORITY\System' and Data[@Name='UserName'] != 'System' and Data[@Name='TaskName'] != '\Microsoft\Windows\SoftwareProtectionPlatform\SvcRestartTask']]</Select>
+    </Query>
+  -->
+  
+</QueryList>
+]]>
+    </Query>
+    <ReadExistingEvents>true</ReadExistingEvents>
+    <TransportName>HTTP</TransportName>
+    <ContentFormat>Events</ContentFormat>
+    <Locale Language="en-US"/>
+    <LogFile>ForwardedEvents</LogFile>
+    <PublisherName>Microsoft-Windows-EventCollector</PublisherName>
+    <AllowedSourceNonDomainComputers>
+        <AllowedIssuerCAList>
+        </AllowedIssuerCAList>
+    </AllowedSourceNonDomainComputers>
+    <AllowedSourceDomainComputers></AllowedSourceDomainComputers>
+</Subscription>

@@ -1,0 +1,678 @@
+<Sysmon schemaversion="3.30">
+
+<!-- This configuration file should suit many common deployment scenarios, and aims to achieve a happy medium of capturing most potentially malicious events, while still filtering some noise.
+
+The file may need customisation depending on the network's configuration and software.
+
+If a more lightweight version of this configuration is necessary, potentially noisy events can be removed.
+This will reduce some of the analytics and detection methods, but the data will still be very valuable for an investigation.
+This can be achieved by:
+ * Modifying Hash Algorithms: <HashAlgorithms>MD5,SHA1</HashAlgorithms>
+ * Removing the FileCreateTime event
+ * Removing the ImageLoad event
+ * Removing the NetworkConnect event
+ * Removing the FileCreateStreamHash event
+ * Remove the following from the RegistryEvent:
+    <TargetObject condition="end with">DhcpIPAddress</TargetObject>
+    <TargetObject condition="end with">DhcpIPv6Address</TargetObject>
+
+See https://technet.microsoft.com/en-au/sysinternals/sysmon, https://www.rsaconference.com/writable/presentations/file_upload/hta-w05-tracking_hackers_on_your_network_with_sysinternals_sysmon.pdf and https://www.rsaconference.com/writable/presentations/file_upload/hta-t09-how-to-go-from-responding-to-hunting-with-sysinternals-sysmon.pdf for reference material.
+
+A range of public Sysmon configurations have also been captured on this github page: https://github.com/MHaggis/sysmon-dfir
+-->
+ 
+ <HashAlgorithms>MD5,SHA256</HashAlgorithms> <!-- Capture both MD5 and SHA256, to have both a backwards compatible and a more secure hash -->
+ <!-- Certificate revocation checking is turned off given the increased network load but can be turned on by <CheckRevocation/> -->
+ 
+ <EventFiltering>
+ 
+  <!-- Capture all driver loads excluding Microsoft/Windows ones -->
+  <DriverLoad onmatch="exclude">
+   <Signature condition="contains">microsoft</Signature>
+   <Signature condition="contains">windows</Signature>
+  </DriverLoad>
+  
+  <!-- Capture Image loads excluding Microsoft/Windows, common third-party applications and .NET related assemblies. -->
+  <ImageLoad onmatch="exclude">
+    <!-- Filter non Microsoft image loads -->
+    <Signature condition="contains">microsoft</Signature>
+    <Signature condition="contains">windows</Signature>
+    
+    <!-- Exclude common third-party signatures -->
+    <Signature condition="is">Mozilla Corporation</Signature>
+    <Signature condition="is">Google Inc</Signature>
+    <Signature condition="is">Adobe Systems</Signature>
+    <Signature condition="is">VMware</Signature>
+    <Signature condition="is">Oracle Corporation</Signature>
+    <Signature condition="is">Oracle America</Signature>
+    <Signature condition="is">Python Software Foundation</Signature>
+    
+    <!-- These applications load a large amount of .NET unsigned assemblies -->
+    <Image condition="end with">\mscorsvw.exe</Image> 
+    <Image condition="end with">\ngen.exe</Image>
+    
+    <Image condition="end with">:\Windows\System32\backgroundTaskHost.exe</Image>
+    
+    <Image condition="end with">:\Windows\SysWOW64\msiexec.exe</Image>
+    <Image condition="end with">:\Windows\System32\msiexec.exe</Image>
+    
+    <!-- This path contains .NET compiled DLLS that are not signed -->
+    <ImageLoaded condition="contains">:\Windows\assembly\NativeImages_</ImageLoaded>
+    <ImageLoaded condition="contains">:\Windows\assembly\tmp\</ImageLoaded>
+  </ImageLoad>
+  
+  <!-- Capture all processes created except some frequently started and stopped services -->
+  <ProcessCreate onmatch="exclude">
+    <ParentImage condition="end with">:\Windows\System32\SearchIndexer.exe</ParentImage> <!-- Filter out any processes search indexer creates to filter excessive noise.  -->
+    <ParentImage condition="end with">\ngentask.exe</ParentImage> <!-- .NET associated executable that creates a large number of processes -->
+    
+    <Image condition="end with">:\Windows\System32\wermgr.exe</Image>
+    <Image condition="end with">:\Windows\System32\conhost.exe</Image>
+    <Image condition="end with">:\Windows\CCM\UpdateTrustedSites.exe</Image>
+    <Image condition="end with">:\Windows\System32\wbem\wmiprvse.exe</Image>
+    
+  </ProcessCreate>
+  
+  <!-- Capture all process terminations (to help with correlation), excluding requently started and stopped services -->
+  <ProcessTerminate onmatch="exclude">
+    <!-- Filter out noisy processes' termination results -->
+    <Image condition="end with">:\Windows\System32\SearchProtocolHost.exe</Image>
+    <Image condition="end with">:\Windows\System32\SearchFilterHost.exe</Image>
+    <Image condition="end with">\ngen.exe</Image>
+    <Image condition="end with">:\Windows\System32\conhost.exe</Image>
+    <Image condition="end with">:\Windows\CCM\UpdateTrustedSites.exe</Image>
+    <Image condition="end with">:\Windows\System32\wbem\wmiprvse.exe</Image>
+    <Image condition="end with">:\Windows\System32\wermgr.exe</Image>
+  </ProcessTerminate>
+  
+  <!-- Capture creation time modification with some filters for common applications -->
+  <FileCreateTime onmatch="exclude">
+    <Image condition="end with">:\Windows\System32\backgroundTaskHost.exe</Image> <!-- These processes appears to often change file creation times -->
+    <Image condition="end with">Chrome\Application\chrome.exe</Image>
+    <Image condition="end with">Mozilla Firefox\firefox.exe</Image>
+    <Image condition="end with">:\Windows\System32\svchost.exe</Image>
+    <Image condition="end with">:\Windows\SysWOW64\msiexec.exe</Image>
+    <Image condition="end with">:\Windows\System32\msiexec.exe</Image>
+    <Image condition="end with">\Microsoft\OneDrive\OneDrive.exe</Image>
+  </FileCreateTime>
+  
+  <!-- Only include initiated connections to reduce load on servers - e.g. not incoming connections -->
+  <NetworkConnect onmatch="include">
+    <Initiated>true</Initiated>
+  </NetworkConnect>
+  
+  <!-- Capture network connections excluding common web browsers, mail clients, and common services. -->
+  <!-- Note: this does not include failed network connections - e.g. port scanning -->
+  <NetworkConnect onmatch="exclude">
+    <!-- Exclude browsers - since these are expected to make network connections and usually only proxy connections are captured -->
+    <Image condition="end with">\Internet Explorer\iexplore.exe</Image>
+    <Image condition="end with">\MicrosoftEdgeCP.exe</Image>
+    <Image condition="end with">\MicrosoftEdge.exe</Image>
+    <Image condition="end with">Chrome\Application\chrome.exe</Image>
+    <Image condition="end with">Mozilla Firefox\firefox.exe</Image>
+    
+    <!-- Exclude other common noise -->
+    <Image condition="end with">:\Windows\System32\wermgr.exe</Image>
+    <Image condition="end with">:\Windows\System32\spoolsv.exe</Image>
+    
+    <DestinationIp condition="is">0:0:0:0:0:0:0:1</DestinationIp>
+    <DestinationIp condition="begin with">127.</DestinationIp>
+    
+    <!-- SCCM (https://technet.microsoft.com/en-us/library/bb632618.aspx) -->
+    <DestinationPort condition="is">8531</DestinationPort>
+    <DestinationPort condition="is">8530</DestinationPort>
+    <Image condition="end with">:\Windows\CCM\CcmExec.exe</Image>
+    <Image condition="end with">ccmsetup\ccmsetup.exe</Image>
+    <Image condition="end with">:\Windows\CCM\ccmeval.exe</Image>
+    <Image condition="end with">\OUTLOOK.exe</Image>
+    
+    <!-- Exchange generates too much outgoing network activity -->
+    <Image condition="contains">:\Program Files\Microsoft\Exchange Server\</Image>
+    
+    <!-- IIS generates too much outgoing network activity -->
+    <Image condition="end with">:\Windows\System32\inetsrv\w3wp.exe</Image>
+  </NetworkConnect>
+  
+  <!-- Capture most remote thread creations apart from common system activity -->
+  <!-- Note: This will not capture QueueUserAPC method of thread injection (https://msdn.microsoft.com/en-us/library/windows/desktop/ms684954(v=vs.85).aspx) -->
+  <CreateRemoteThread onmatch="exclude">
+    <SourceImage condition="end with">:\Windows\System32\csrss.exe</SourceImage> <!-- csrss.exe creates many remote threads on boot -->
+    <SourceImage condition="end with">:\Windows\System32\wbem\wmiprvse.exe</SourceImage> <!-- creates many remote threads in some environments -->
+    <SourceImage condition="end with">:\ngen.exe</SourceImage> <!-- creates many threads when .NET is updated -->
+  </CreateRemoteThread>
+  
+  <!-- Event is not working in testing on Sysmon 5.02, however this could be useful for capturing attempts to access NTDS.dit through raw disk access.
+  See https://clymb3r.wordpress.com/2013/06/13/using-powershell-to-copy-ntds-dit-registry-hives-bypass-sacls-dacls-file-locks/
+  <RawAccessRead onmatch="include">
+  </RawAccessRead>
+  -->
+  
+  <!-- Capture process access. The filter restricts access to lsass and winlogon to catch credential dumping.
+       Additionally, capture call traces that contain UNKNOWN, indicating code tied to a non-loaded moudule.
+       This may indicate shellcode or similar runtime code is trying to perform process injection
+       but it can also be triggered by just-in-time compilers. -->
+  <ProcessAccess onmatch="include">    
+    <TargetImage condition="end with">:\Windows\System32\lsass.exe</TargetImage>
+    <TargetImage condition="end with">:\Windows\System32\winlogon.exe</TargetImage>
+    <CallTrace condition="contains">UNKNOWN</CallTrace>
+  </ProcessAccess>
+  
+  <ProcessAccess onmatch="exclude">
+     <!-- Filter out common access masks
+          A reference is available here for the mask: https://msdn.microsoft.com/en-us/library/windows/desktop/ms684880%28v=vs.85%29.aspx
+          Ideally an access mask with any of the following is useful:
+          PROCESS_VM_WRITE (0x0020)
+          PROCESS_VM_READ (0x0010)
+          PROCESS_VM_OPERATION (0x0008)
+          
+          0x1410 (potential memory read) is common activity. E.g. by taskmgr.exe. We only want to capture this against lsass.exe and winlogon.exe, but this logic is in the subscription.
+          -->
+     <GrantedAccess condition="is">0x40</GrantedAccess>
+     <GrantedAccess condition="is">0x101000</GrantedAccess>
+     <GrantedAccess condition="is">0x1000</GrantedAccess>
+     <GrantedAccess condition="is">0x1400</GrantedAccess>
+     <GrantedAccess condition="is">0x100000</GrantedAccess>
+     <GrantedAccess condition="is">0x3200</GrantedAccess>
+     <GrantedAccess condition="is">0x101400</GrantedAccess>
+     <GrantedAccess condition="is">0x101001</GrantedAccess>
+     
+     <!-- These binaries appear to access lsass legitimately -->
+     <SourceImage condition="end with">\Google\Update\GoogleUpdate.exe</SourceImage>
+     <SourceImage condition="end with">:\Windows\System32\wbem\wmiprvse.exe</SourceImage>
+     <SourceImage condition="end with">Microsoft Security Client\MsMpEng.exe</SourceImage>
+     <SourceImage condition="end with">\EMET_Service.exe</SourceImage>
+     <SourceImage condition="end with">\EMET_GUI.exe</SourceImage>
+     <SourceImage condition="end with">\procexp64.exe</SourceImage>
+     <SourceImage condition="end with">\Bin\FMS.exe</SourceImage> <!-- Exchange Process -->
+     <SourceImage condition="end with">:\Windows\System32\smss.exe</SourceImage>
+     <SourceImage condition="end with">:\Windows\system32\csrss.exe</SourceImage>
+     <SourceImage condition="end with">:\Windows\system32\wininit.exe</SourceImage>
+     
+     <!-- Exchange Processes: -->
+     <SourceImage condition="contains">:\Program Files\Microsoft\Exchange Server\</SourceImage>
+     
+     <!-- These binaries get or access processes running .NET -->
+     <SourceImage condition="end with">:\Windows\system32\sppsvc.exe</SourceImage>
+     <SourceImage condition="end with">:\Windows\system32\sdiagnhost.exe</SourceImage>
+     
+     <!-- In testing a common false-positive is memory space that DLLS would be expected to mapped to. -->
+     <CallTrace condition="contains">UNKNOWN(00007F</CallTrace>
+   </ProcessAccess>
+   
+  <!-- Match on potentially suspicious extensions based on https://technet.microsoft.com/en-us/library/cc179163(v=office.14).aspx and https://technet.microsoft.com/en-us/library/cc262496.aspx -->
+  <!-- This is not full proof but may give some visibility into the initial malicious activity. For example, after execution an attacker can create a file with any extension and rename it. -->
+  <FileCreate onmatch="include">
+    <!-- Archives -->
+    <TargetFilename condition="end with">.7z</TargetFilename>
+    <TargetFilename condition="end with">.rar</TargetFilename>
+    <TargetFilename condition="end with">.zip</TargetFilename>
+    <TargetFilename condition="end with">.cab</TargetFilename>
+    <TargetFilename condition="end with">.xz</TargetFilename>
+    <TargetFilename condition="end with">.lzma</TargetFilename>
+    <TargetFilename condition="end with">.bz2</TargetFilename>
+    <TargetFilename condition="end with">.gz</TargetFilename>
+    <TargetFilename condition="end with">.tar</TargetFilename>
+    <TargetFilename condition="end with">.wim</TargetFilename>
+    
+    <!-- Executables -->
+    <TargetFilename condition="end with">.com</TargetFilename>
+    <TargetFilename condition="end with">.cpl</TargetFilename>
+    <TargetFilename condition="end with">.dll</TargetFilename>
+    <TargetFilename condition="end with">.exe</TargetFilename>
+    <TargetFilename condition="end with">.ocx</TargetFilename>
+    <TargetFilename condition="end with">.scr</TargetFilename>
+    <TargetFilename condition="end with">.sys</TargetFilename>
+    <TargetFilename condition="end with">.msi</TargetFilename>
+    <TargetFilename condition="end with">.msp</TargetFilename>
+    
+    <!-- Links -->
+    <TargetFilename condition="end with">.lnk</TargetFilename>
+    <TargetFilename condition="end with">.cmd</TargetFilename>
+    <TargetFilename condition="end with">.pif</TargetFilename>
+    <TargetFilename condition="end with">.url</TargetFilename>
+    
+    <!-- Java -->
+    <TargetFilename condition="end with">.class</TargetFilename>
+    <TargetFilename condition="end with">.jar</TargetFilename>
+    
+    <!-- Scripts or can contain scripts -->
+    <TargetFilename condition="end with">.chm</TargetFilename>
+    <TargetFilename condition="end with">.ps1</TargetFilename>
+    <TargetFilename condition="end with">.ps1xml</TargetFilename>
+    <TargetFilename condition="end with">.ps2</TargetFilename>
+    <TargetFilename condition="end with">.ps2xml</TargetFilename>
+    <TargetFilename condition="end with">.vbs</TargetFilename>
+    <TargetFilename condition="end with">.wsh</TargetFilename>
+    <TargetFilename condition="end with">.js</TargetFilename>
+    <TargetFilename condition="end with">.jse</TargetFilename>
+    <TargetFilename condition="end with">.pl</TargetFilename>
+    <TargetFilename condition="end with">.hta</TargetFilename>
+    <TargetFilename condition="end with">.bas</TargetFilename>
+    <TargetFilename condition="end with">.bat</TargetFilename>
+    <TargetFilename condition="end with">.ksh</TargetFilename>
+    <TargetFilename condition="end with">.vb</TargetFilename>
+    <TargetFilename condition="end with">.vbe</TargetFilename>
+    <TargetFilename condition="end with">.sct</TargetFilename>
+    <TargetFilename condition="end with">.mht</TargetFilename>
+    <TargetFilename condition="end with">.msh</TargetFilename>
+    <TargetFilename condition="end with">.msh1</TargetFilename>
+    <TargetFilename condition="end with">.msh2</TargetFilename>
+    <TargetFilename condition="end with">.mshxml</TargetFilename>
+    <TargetFilename condition="end with">.msh1xml</TargetFilename>
+    <TargetFilename condition="end with">.msh2xml</TargetFilename>
+    <TargetFilename condition="end with">.psc1</TargetFilename>
+    <TargetFilename condition="end with">.psc2</TargetFilename>
+    <TargetFilename condition="end with">.ws</TargetFilename>
+    <TargetFilename condition="end with">.wsc</TargetFilename>
+    <TargetFilename condition="end with">.wsf</TargetFilename>
+    <TargetFilename condition="end with">.csh</TargetFilename>
+    
+    <!-- Web server files -->
+    <TargetFilename condition="end with">.asp</TargetFilename>
+    <TargetFilename condition="end with">.aspx</TargetFilename>
+    <TargetFilename condition="end with">.asax</TargetFilename>
+    <TargetFilename condition="end with">.php</TargetFilename>
+    <TargetFilename condition="end with">.shtm</TargetFilename>
+    <TargetFilename condition="end with">.shtml</TargetFilename>
+    <TargetFilename condition="end with">.ashx</TargetFilename>
+    <TargetFilename condition="end with">.asmx</TargetFilename>
+    
+    <!-- Other -->
+    <TargetFilename condition="end with">.reg</TargetFilename>
+    <TargetFilename condition="end with">.mad</TargetFilename>
+    <TargetFilename condition="end with">.maf</TargetFilename>
+    <TargetFilename condition="end with">.mag</TargetFilename>
+    <TargetFilename condition="end with">.mam</TargetFilename>
+    <TargetFilename condition="end with">.maq</TargetFilename>
+    <TargetFilename condition="end with">.mar</TargetFilename>
+    <TargetFilename condition="end with">.mas</TargetFilename>
+    <TargetFilename condition="end with">.mat</TargetFilename>
+    <TargetFilename condition="end with">.mau</TargetFilename>
+    <TargetFilename condition="end with">.mav</TargetFilename>
+    <TargetFilename condition="end with">.maw</TargetFilename>
+    <TargetFilename condition="end with">.mcf</TargetFilename>
+    <TargetFilename condition="end with">.mda</TargetFilename>
+    <TargetFilename condition="end with">.mdb</TargetFilename>
+    <TargetFilename condition="end with">.mde</TargetFilename>
+    <TargetFilename condition="end with">.mdt</TargetFilename>
+    <TargetFilename condition="end with">.mdw</TargetFilename>
+    
+    <TargetFilename condition="end with">.ade</TargetFilename>
+    <TargetFilename condition="end with">.adp</TargetFilename>
+    <TargetFilename condition="end with">.app</TargetFilename>
+    <TargetFilename condition="end with">.application</TargetFilename>
+    <TargetFilename condition="end with">.asa</TargetFilename>
+    <TargetFilename condition="end with">.cdx</TargetFilename>
+    <TargetFilename condition="end with">.cer</TargetFilename>
+    
+    <TargetFilename condition="end with">.cnt</TargetFilename>
+    <!--.config-->
+    
+    <TargetFilename condition="end with">.crt</TargetFilename>
+    
+    <TargetFilename condition="end with">.der</TargetFilename>
+    <TargetFilename condition="end with">.fxp</TargetFilename>
+    <TargetFilename condition="end with">.gadget</TargetFilename>
+    <TargetFilename condition="end with">.grp</TargetFilename>
+    <TargetFilename condition="end with">.hlp</TargetFilename>
+    <TargetFilename condition="end with">.hpj</TargetFilename>
+    <TargetFilename condition="end with">.htr</TargetFilename>
+    <TargetFilename condition="end with">.htw</TargetFilename>
+    <TargetFilename condition="end with">.ida</TargetFilename>
+    <TargetFilename condition="end with">.idc</TargetFilename>
+    <TargetFilename condition="end with">.idq</TargetFilename>
+    <TargetFilename condition="end with">.inf</TargetFilename>
+    <TargetFilename condition="end with">.ins</TargetFilename>
+    <TargetFilename condition="end with">.isp</TargetFilename>
+    <TargetFilename condition="end with">.its</TargetFilename>
+    
+    <TargetFilename condition="end with">.mdz</TargetFilename>
+    <TargetFilename condition="end with">.msc</TargetFilename>
+    
+    <TargetFilename condition="end with">.mst</TargetFilename>
+    
+    <TargetFilename condition="end with">.ops</TargetFilename>
+    <TargetFilename condition="end with">.osd</TargetFilename>
+    <TargetFilename condition="end with">.pcd</TargetFilename>
+    <TargetFilename condition="end with">.plg</TargetFilename>
+    <TargetFilename condition="end with">.prf</TargetFilename>
+    <TargetFilename condition="end with">.prg</TargetFilename>
+    <TargetFilename condition="end with">.printer</TargetFilename>
+    
+    <!--TargetFilename condition="end with">.pst</TargetFilename-->
+    <TargetFilename condition="end with">.rem</TargetFilename>
+    <TargetFilename condition="end with">.scf</TargetFilename>
+    
+    <TargetFilename condition="end with">.sdb</TargetFilename>
+    <TargetFilename condition="end with">.shb</TargetFilename>
+    <TargetFilename condition="end with">.shs</TargetFilename>
+    
+    <TargetFilename condition="end with">.stm</TargetFilename>
+    
+    <!--TargetFilename condition="end with">.tmp</TargetFilename-->
+    
+    <TargetFilename condition="end with">.vpb</TargetFilename>
+    
+    <TargetFilename condition="end with">.vsix</TargetFilename>
+    <TargetFilename condition="end with">.vsmacros</TargetFilename>
+    <TargetFilename condition="end with">.vsw</TargetFilename>
+    
+    <TargetFilename condition="end with">.xamlx</TargetFilename>
+    <TargetFilename condition="end with">.xbap</TargetFilename>
+    <TargetFilename condition="end with">.xnk</TargetFilename>
+    
+    <TargetFilename condition="end with">.war</TargetFilename>
+    
+    <!-- MSBuild can bypass applocker using .rsp files - https://twitter.com/subTee/status/829684886399234048 -->
+    <TargetFilename condition="end with">.rsp</TargetFilename>
+    
+    <!-- Capture other sensitive locations -->
+    <TargetFilename condition="contains">\Microsoft\Windows\Start Menu\Programs\Startup\</TargetFilename>
+    <TargetFilename condition="contains">:\Windows\Tasks</TargetFilename>
+  </FileCreate>
+ 
+  <FileCreate onmatch="exclude">
+    <!-- Filter common noisy locations -->
+    <TargetFilename condition="contains">AppData\Roaming\Microsoft\Windows\Recent\</TargetFilename>
+    <TargetFilename condition="contains">Microsoft\Internet Explorer\Quick Launch\</TargetFilename>
+    <TargetFilename condition="contains">AppData\Roaming\Microsoft\Office\Recent\</TargetFilename>
+    
+    <TargetFilename condition="contains">\INetCache\</TargetFilename>
+    <TargetFilename condition="contains">:\Config.Msi</TargetFilename>
+    
+    <!-- Locations that commonly drop .js files -->
+    <TargetFilename condition="contains">AppData\Local\Microsoft\Windows\Temporary Internet Files\</TargetFilename> <!-- Internet Explorer cache -->
+    
+    <!-- These binaries frequently create DLL files -->
+    <Image condition="end with">:\Windows\System32\cleanmgr.exe</Image>
+    <Image condition="end with">:\Windows\System32\svchost.exe</Image>
+    <Image condition="end with">\mscorsvw.exe</Image>
+    
+    <!-- This binary creates large number of executable files -->
+    <Image condition="end with">\TiWorker.exe</Image>
+    
+    <!-- Windows Defender frequently drops executables -->
+    <Image condition="end with">:\Program Files\Windows Defender\MpCmdRun.exe</Image>
+    <Image condition="end with">:\Program Files\Windows Defender\MsMpEng.exe</Image>
+    
+    <!-- This binary frequently creates .js files -->
+    <Image condition="end with">\SearchUI.exe</Image>
+    
+    <!-- Cortana's SearchUI.exe frequently creates .js files -->
+    <Image condition="end with">\SearchUI.exe</Image>
+    
+    <!-- Mozilla -->
+    <Image condition="end with">\Mozilla Maintenance Service\update\updater.exe</Image>
+    <Image condition="end with">\Mozilla Maintenance Service\maintenanceservice.exe</Image>
+    <TargetFilename condition="end with">.default\prefs-1.js</TargetFilename> <!-- Mozilla preferences -->
+    
+    <!-- Chrome -->
+    <Image condition="end with">\Google\Update\GoogleUpdate.exe</Image>
+    <TargetFilename condition="contains">\CRX_INSTALL\</TargetFilename>
+    
+    <!-- Exclude ASP.NET temporary path, which IIS frequently writes to -->
+    <TargetFilename condition="contains">\Temporary ASP.NET Files\</TargetFilename>
+    
+    <!-- Add other common update programs for your network -->
+    
+  </FileCreate>
+ 
+<!-- 
+Capture registry events including many of the known registry persistence locations, some other sensitive locations, and capture IP address changes to assist with correlation
+Sysmon's output paths are now 'friendly names' as of version 6. E.g. HKLM, and HKEY_USERS\[SID]
+        
+        Note: Sysmon will match against all ControlSet paths. E.g. by setting a key under ControlSet001, the filter will still catch this.
+        
+        Note: A potential bypass is by renaming a key, e.g. from Microsoft\Windows\CurrentVersion\New to Microsoft\Windows\CurrentVersion\Run. The current filter schema (as of Sysmon 5.02) doesn't allow filtering by NewName, so these events get missed.
+-->
+<RegistryEvent onmatch="include">
+    <!-- Capture persistence locations based on the registry paths in Autoruns 13.7  -->
+    <TargetObject condition="contains">HKLM\System\CurrentControlSet\Control\Terminal Server\Wds\rdpwd\StartupPrograms</TargetObject>
+    <TargetObject condition="contains">HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\AppSetup</TargetObject>
+    
+    <TargetObject condition="contains">HKLM\Software\Policies\Microsoft\Windows\System\Scripts\Startup</TargetObject>
+    <TargetObject condition="contains">Software\Policies\Microsoft\Windows\System\Scripts\Logon</TargetObject>
+    
+    <TargetObject condition="contains">HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\Userinit</TargetObject>
+    <TargetObject condition="contains">HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\VmApplet</TargetObject>
+    
+    <TargetObject condition="contains">HKLM\Software\Policies\Microsoft\Windows\System\Scripts\Shutdown</TargetObject>
+    
+    <TargetObject condition="contains">Software\Policies\Microsoft\Windows\System\Scripts\Logoff</TargetObject>
+    
+    <TargetObject condition="contains">HKLM\Software\Microsoft\Windows\CurrentVersion\Group Policy\Scripts\Startup</TargetObject>
+    <TargetObject condition="contains">HKLM\Software\Microsoft\Windows\CurrentVersion\Group Policy\Scripts\Shutdown</TargetObject>
+    
+    <TargetObject condition="contains">Software\Microsoft\Windows\CurrentVersion\Policies\System\Shell</TargetObject>
+    <TargetObject condition="contains">Software\Microsoft\Windows NT\CurrentVersion\Winlogon\Shell</TargetObject>
+    
+    <TargetObject condition="contains">HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\Shell</TargetObject>
+    <TargetObject condition="contains">HKLM\System\CurrentControlSet\Control\SafeBoot\AlternateShell</TargetObject>
+    
+    <TargetObject condition="contains">HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\Taskman</TargetObject>
+    <TargetObject condition="contains">HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\AlternateShells\AvailableShells</TargetObject>
+    
+    <TargetObject condition="contains">Microsoft\Windows\CurrentVersion\Run</TargetObject>
+    <TargetObject condition="contains">Microsoft\Windows\CurrentVersion\Runonce</TargetObject>
+    <TargetObject condition="contains">Microsoft\Windows\CurrentVersion\RunonceEx</TargetObject>
+    
+    <!-- look for all changes to this path not just InitialProgram -->
+    <TargetObject condition="contains">HKLM\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp\</TargetObject>
+    <TargetObject condition="contains">HKLM\System\CurrentControlSet\Control\Terminal Server\fDenyTSConnections</TargetObject>
+    
+    <TargetObject condition="contains">Software\Microsoft\Windows NT\CurrentVersion\Windows\Load</TargetObject>
+    <TargetObject condition="contains">Software\Microsoft\Windows NT\CurrentVersion\Windows\Run</TargetObject>
+    
+    <TargetObject condition="contains">Software\Microsoft\Windows\CurrentVersion\Policies\Explorer\Run</TargetObject>
+    
+    <TargetObject condition="contains">Microsoft\Active Setup\Installed Components</TargetObject>
+    <TargetObject condition="contains">HKLM\Software\Microsoft\Windows NT\CurrentVersion\Windows\IconServiceLib</TargetObject>
+    
+    <TargetObject condition="contains">Microsoft\Windows CE Services\AutoStartOnConnect</TargetObject>
+    <TargetObject condition="contains">Microsoft\Windows CE Services\AutoStartOnDisconnect</TargetObject>
+    
+    <TargetObject condition="contains">Software\Classes\Protocols\Filter</TargetObject>
+    <TargetObject condition="contains">Software\Classes\Protocols\Handler</TargetObject>
+    
+    <TargetObject condition="contains">Microsoft\Internet Explorer\Desktop\Components</TargetObject>
+    
+    <TargetObject condition="contains">Microsoft\Windows\CurrentVersion\Explorer\SharedTaskScheduler</TargetObject>
+    <TargetObject condition="contains">Microsoft\Windows\CurrentVersion\Explorer\ShellServiceObjects</TargetObject>
+    <TargetObject condition="contains">Microsoft\Windows\CurrentVersion\ShellServiceObjectDelayLoad</TargetObject>
+    <TargetObject condition="contains">Microsoft\Windows\CurrentVersion\Explorer\ShellExecuteHooks</TargetObject>
+    
+    <TargetObject condition="contains">Classes\*\ShellEx\ContextMenuHandlers</TargetObject>
+    <TargetObject condition="contains">Classes\Drive\ShellEx\ContextMenuHandlers</TargetObject>
+    <TargetObject condition="contains">Classes\*\ShellEx\PropertySheetHandlers</TargetObject>
+    <TargetObject condition="contains">Classes\AllFileSystemObjects\ShellEx\ContextMenuHandlers</TargetObject>
+    <TargetObject condition="contains">Classes\AllFileSystemObjects\ShellEx\DragDropHandlers</TargetObject>
+    <TargetObject condition="contains">Classes\AllFileSystemObjects\ShellEx\PropertySheetHandlers</TargetObject>
+    <TargetObject condition="contains">Classes\Directory\ShellEx\ContextMenuHandlers</TargetObject>
+    <TargetObject condition="contains">Classes\Directory\Shellex\DragDropHandlers</TargetObject>
+    <TargetObject condition="contains">Classes\Directory\Shellex\PropertySheetHandlers</TargetObject>
+    <TargetObject condition="contains">Classes\Directory\Shellex\CopyHookHandlers</TargetObject>
+    <TargetObject condition="contains">Classes\Directory\Background\ShellEx\ContextMenuHandlers</TargetObject>
+    <TargetObject condition="contains">Classes\Folder\Shellex\ColumnHandlers</TargetObject>
+    <TargetObject condition="contains">Classes\Folder\ShellEx\ContextMenuHandlers</TargetObject>
+    <TargetObject condition="contains">Classes\Folder\ShellEx\DragDropHandlers</TargetObject>
+    <TargetObject condition="contains">Classes\Folder\ShellEx\ExtShellFolderViews</TargetObject>
+    <TargetObject condition="contains">Classes\Folder\ShellEx\PropertySheetHandlers</TargetObject>
+    <TargetObject condition="contains">Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers</TargetObject>
+    
+    <!-- Detect all changes to InProcServer32 keys. This key contains a path to a DLL and can be used for persistence. -->
+    <TargetObject condition="contains">\InProcServer32</TargetObject>
+    <!--TargetObject condition="contains">Software\Classes\Clsid\{AB8902B4-09CA-4bb6-B78D-A8F59079A8D5}\Inprocserver32</TargetObject-->
+    
+    <TargetObject condition="contains">Software\Microsoft\Ctf\LangBarAddin</TargetObject>
+    <TargetObject condition="contains">Microsoft\Windows\CurrentVersion\Explorer\Browser Helper Objects</TargetObject>
+    <TargetObject condition="contains">Software\Microsoft\Internet Explorer\UrlSearchHooks</TargetObject>
+    <TargetObject condition="contains">Microsoft\Internet Explorer\Toolbar</TargetObject>
+    <TargetObject condition="contains">Microsoft\Internet Explorer\Explorer Bars</TargetObject>
+    <TargetObject condition="contains">Microsoft\Internet Explorer\Extensions</TargetObject>
+    
+    <!-- Monitor ImagePath, ServiceDll which are important service keys to audit. This allows for tracking changes to services with a managable noise level. -->
+    <TargetObject condition="end with">\ServiceDll</TargetObject>
+    <TargetObject condition="end with">\ImagePath</TargetObject>
+    
+    <!-- Monitor changes to protected process registry keys for services and lsass -->
+    <TargetObject condition="end with">\LaunchProtected</TargetObject>
+    <TargetObject condition="end with">\RunAsPPL</TargetObject>
+    
+    <TargetObject condition="contains">HKLM\Software\Microsoft\Windows NT\CurrentVersion\Font Drivers</TargetObject>
+    <TargetObject condition="contains">Microsoft\Windows NT\CurrentVersion\Drivers32</TargetObject>
+    <TargetObject condition="contains">Software\Classes\Filter</TargetObject>
+    
+    <TargetObject condition="contains">Classes\CLSID\{083863F1-70DE-11d0-BD40-00A0C911CE86}\Instance</TargetObject>
+    <TargetObject condition="contains">Classes\CLSID\{AC757296-3522-4E11-9862-C17BE5A1767E}\Instance</TargetObject>
+    <TargetObject condition="contains">Classes\CLSID\{7ED96837-96F0-4812-B211-F13C24117ED3}\Instance</TargetObject>
+    <TargetObject condition="contains">Classes\CLSID\{ABE3B9A4-257D-4B97-BD1A-294AF496222E}\Instance</TargetObject>
+    
+    <TargetObject condition="contains">HKLM\System\CurrentControlSet\Control\Session Manager\BootExecute</TargetObject>
+    <TargetObject condition="contains">HKLM\System\CurrentControlSet\Control\Session Manager\SetupExecute</TargetObject>
+    <TargetObject condition="contains">HKLM\System\CurrentControlSet\Control\Session Manager\Execute</TargetObject>
+    <TargetObject condition="contains">HKLM\System\CurrentControlSet\Control\Session Manager\S0InitialCommand</TargetObject>
+    <TargetObject condition="contains">HKLM\System\CurrentControlSet\Control\ServiceControlManagerExtension</TargetObject>
+    
+    <TargetObject condition="contains">Microsoft\Windows NT\CurrentVersion\Image File Execution Options</TargetObject>
+    <TargetObject condition="contains">Microsoft\Command Processor\Autorun</TargetObject>
+    
+    <TargetObject condition="contains">Software\Classes\Exefile\Shell\Open\Command\(Default)</TargetObject>
+    <TargetObject condition="contains">Software\Classes\.exe</TargetObject>
+    <TargetObject condition="contains">Software\Classes\.cmd</TargetObject>
+    <TargetObject condition="contains">Software\Classes\Htmlfile\Shell\Open\Command\(Default)</TargetObject>
+    
+    <TargetObject condition="contains">Microsoft\Windows NT\CurrentVersion\Windows\Appinit_Dlls</TargetObject>
+    <TargetObject condition="contains">HKLM\System\CurrentControlSet\Control\Session Manager\AppCertDlls</TargetObject>
+    <TargetObject condition="contains">HKLM\System\CurrentControlSet\Control\Session Manager\KnownDlls</TargetObject>
+    
+    <TargetObject condition="contains">HKLM\System\Setup\CmdLine</TargetObject>
+    <TargetObject condition="contains">HKLM\Software\Microsoft\Windows\CurrentVersion\Authentication\Credential Providers</TargetObject>
+    <TargetObject condition="contains">HKLM\Software\Microsoft\Windows\CurrentVersion\Authentication\Credential Provider Filters</TargetObject>
+    <TargetObject condition="contains">HKLM\Software\Microsoft\Windows\CurrentVersion\Authentication\PLAP Providers</TargetObject>
+    
+    <TargetObject condition="contains">HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\Taskman</TargetObject>
+    
+    <TargetObject condition="contains">Control Panel\Desktop\Scrnsave.exe</TargetObject>
+    
+    <!-- ImagePath rule will already capture this -->
+    <!--TargetObject condition="contains">HKLM\System\CurrentControlSet\Control\BootVerificationProgram\ImagePath</TargetObject-->
+    
+    <TargetObject condition="contains">HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\GpExtensions</TargetObject>
+    <TargetObject condition="contains">Services\WinSock2\Parameters\Protocol_Catalog9\Catalog_Entries</TargetObject>
+    <TargetObject condition="contains">Services\WinSock2\Parameters\NameSpace_Catalog5\Catalog_Entries</TargetObject>
+    <TargetObject condition="contains">Services\WinSock2\Parameters\Protocol_Catalog9\Catalog_Entries64</TargetObject>
+    <TargetObject condition="contains">Services\WinSock2\Parameters\NameSpace_Catalog5\Catalog_Entries64</TargetObject>
+    <TargetObject condition="contains">HKLM\System\CurrentControlSet\Control\Print\Monitors</TargetObject>
+    <TargetObject condition="contains">HKLM\System\CurrentControlSet\Control\Print\Providers</TargetObject>
+    <TargetObject condition="contains">HKLM\System\CurrentControlSet\Control\SecurityProviders\SecurityProviders</TargetObject>
+    <TargetObject condition="contains">HKLM\System\CurrentControlSet\Control\Lsa\Authentication Packages</TargetObject>
+    <TargetObject condition="contains">HKLM\System\CurrentControlSet\Control\Lsa\Notification Packages</TargetObject>
+    <TargetObject condition="contains">HKLM\System\CurrentControlSet\Control\Lsa\Security Packages</TargetObject>
+    <TargetObject condition="contains">HKLM\System\CurrentControlSet\Control\Lsa\OSConfig\Security Packages</TargetObject>
+    <TargetObject condition="contains">HKLM\System\CurrentControlSet\Control\NetworkProvider\Order</TargetObject>
+    <TargetObject condition="contains">Microsoft\Office\Outlook\Addins</TargetObject>
+    <TargetObject condition="contains">Microsoft\Office\Excel\Addins</TargetObject>
+    <TargetObject condition="contains">Microsoft\Office\PowerPoint\Addins</TargetObject>
+    <TargetObject condition="contains">Microsoft\Office\Word\Addins</TargetObject>
+    <TargetObject condition="contains">Microsoft\Office\Access\Addins</TargetObject>
+    <TargetObject condition="contains">Software\Microsoft\Office test\Special\Perf\(Default)</TargetObject>
+
+    <!-- Some other sensitive locations from https://www.malwarearchaeology.com/s/Windows-Registry-Auditing-Cheat-Sheet-ver-Oct-2016.pdf --> 
+    <TargetObject condition="contains">Software\WinRAR</TargetObject>
+    <TargetObject condition="contains">Control\Terminal Server\AddIns</TargetObject>
+    <TargetObject condition="contains">Clients\Mail</TargetObject>
+    <TargetObject condition="contains">Microsoft\Terminal Server Client</TargetObject>
+    <TargetObject condition="contains">Microsoft\VBA\Monitors</TargetObject>
+    <TargetObject condition="contains">Microsoft\Windows\CurrentVersion\Explorer\TBDEn</TargetObject>
+    <TargetObject condition="contains">Microsoft\Windows\CurrentVersion\Explorer\Shell Extensions</TargetObject>
+    <TargetObject condition="contains">Microsoft\Windows\CurrentVersion\AeDebug</TargetObject>
+    <TargetObject condition="contains">Microsoft\Windows\CurrentVersion\SystemRestore</TargetObject>
+    
+    <!-- UAC bypass technique using environment variables and scheduled tasks: https://tyranidslair.blogspot.com.au/2017/05/exploiting-environment-variables-in.html -->
+    <!-- This will capture System, and per user environment variables. -->
+    <TargetObject condition="contains">\Environment\</TargetObject>
+    <TargetObject condition="contains">\Volatile Enviornment\</TargetObject>
+    
+    <!-- Windows Update persistence mechanism from http://www.hexacorn.com/blog/2017/03/18/beyond-good-ol-run-key-part-60/ -->
+    <TargetObject condition="contains">Microsoft\Windows\CurrentVersion\WindowsUpdate\Setup\ServiceStartup\</TargetObject>
+    
+    <!-- UAC bypass - sdclt.exe from https://enigma0x3.net/2017/03/14/bypassing-uac-using-app-paths/ -->
+    <TargetObject condition="contains">Microsoft\Windows\CurrentVersion\App Paths\</TargetObject>
+    
+    <!-- UAC bypass - sdclt.exe from https://enigma0x3.net/2017/03/17/fileless-uac-bypass-using-sdclt-exe/ -->
+    <TargetObject condition="contains">Software\Classes\exefile\shell\runas\command\isolatedCommand</TargetObject>
+    
+    <!-- SHIM based persistence from https://www.fireeye.com/blog/threat-research/2017/05/fin7-shim-databases-persistence.html -->
+    <TargetObject condition="contains">Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Custom</TargetObject>
+    <TargetObject condition="contains">Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\InstalledSDB</TargetObject>
+    
+    <!-- Audit changes to IP addresses in the registry. This will help with correlation of events using IP addresses.
+         See https://msdn.microsoft.com/en-us/library/dn167252.aspx for more details.
+    -->
+    <TargetObject condition="end with">DhcpIPAddress</TargetObject>
+    <TargetObject condition="end with">DhcpIPv6Address</TargetObject>
+        
+    <!-- Monitor changes to WDigest, which could allow for plaintext credentials to be stored - https://www.trustedsec.com/april-2015/dumping-wdigest-creds-with-meterpreter-mimikatzkiwi-in-windows-8-1/ -->
+    <TargetObject condition="contains">CurrentControlSet\Control\SecurityProviders\WDigest</TargetObject>
+  </RegistryEvent>
+  
+  <RegistryEvent onmatch="exclude">
+    <!-- Only examine SetValue and RenameKey events to reduce amount of data. 
+         Note: creating a key with a specific value will result in both a CreateKey and SetValue event
+     -->
+    <EventType condition="is">CreateKey</EventType>
+    <EventType condition="is">DeleteKey</EventType>
+    <EventType condition="is">DeleteValue</EventType>
+    
+    <!-- Filter out common false-positives -->
+    <TargetObject condition="end with">Microsoft\Internet Explorer\Toolbar\Locked</TargetObject>
+    <TargetObject condition="end with">Microsoft\Internet Explorer\Toolbar\ShellBrowser\ITBar7Layout</TargetObject>
+  </RegistryEvent>
+  
+  <!-- Include all streams created in user directories. E.g. to get hashes of downloads -->
+  <FileCreateStreamHash onmatch="include">
+    <TargetFilename condition="contains">:\Users\</TargetFilename>
+  </FileCreateStreamHash>
+  
+  <!-- Named Pipe creation and connected events -->
+  <PipeEvent onmatch="exclude">
+    <!-- Exclude common pipe names (except eventlog)-->
+    <PipeName condition="is">\srvsvc</PipeName>
+    <PipeName condition="is">\wkssvc</PipeName>
+    <PipeName condition="is">\lsass</PipeName>
+    <PipeName condition="is">\MsFteWds</PipeName>
+    <PipeName condition="is">\W32TIME_ALT</PipeName>
+    <PipeName condition="is">\trkwks</PipeName>
+    <PipeName condition="is">\spoolss</PipeName>
+    <PipeName condition="is">\scerpc</PipeName>
+    <PipeName condition="is">\ntsvcs</PipeName>
+    <PipeName condition="is">\epmapper</PipeName>
+    <PipeName condition="is">\browser</PipeName>
+    <PipeName condition="is">\protected_storage</PipeName>
+    <PipeName condition="is">\plugplay</PipeName>
+    <PipeName condition="is">\epmapper</PipeName>
+    <PipeName condition="is">\keysvc</PipeName>
+    <PipeName condition="is">\atsvc</PipeName>
+    <PipeName condition="is">&lt;Anonymous Pipe&gt;</PipeName>
+    <PipeName condition="is">\TermSrv_API_service</PipeName>
+    <PipeName condition="is">\LSM_API_service</PipeName>
+    <PipeName condition="is">\PIPE_EVENTROOT\CIMV2SCM EVENT PROVIDER</PipeName>
+    <PipeName condition="is">\emet_service</PipeName>
+    <PipeName condition="is">\emet_agent_1</PipeName>
+    <PipeName condition="is">\emet_agent_2</PipeName>
+    <PipeName condition="is">\vgauth-service</PipeName>
+    <PipeName condition="contains">VBoxTrayIPC-</PipeName>
+    <PipeName condition="begin with">\iisipm</PipeName>
+    <PipeName condition="begin with">\Winsock2\CatalogChangeListener-</PipeName>
+    
+    <!-- Exclude common programs that generate significant events -->
+    <Image condition="end with">:\Windows\system32\wbem\wmiprvse.exe</Image>
+    <Image condition="end with">:\Windows\system32\rundll32.exe</Image>
+    <Image condition="end with">:\windows\system32\inetsrv\w3wp.exe</Image>
+    <Image condition="contains">:\Program Files\Microsoft\Exchange Server\</Image>
+    <Image condition="contains">:\Windows\Microsoft.NET\</Image>
+  </PipeEvent>
+ 
+ </EventFiltering>
+</Sysmon>
+

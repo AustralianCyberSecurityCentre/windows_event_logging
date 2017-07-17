@@ -1,0 +1,34 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Subscription xmlns="http://schemas.microsoft.com/2006/03/windows/events/subscription">
+    <SubscriptionId>Event Log Cleared</SubscriptionId>
+    <SubscriptionType>SourceInitiated</SubscriptionType>
+    <Description>Records when Windows Event Log files have been cleared</Description>
+    <Enabled>true</Enabled>
+    <Uri>http://schemas.microsoft.com/wbem/wsman/1/windows/EventLog</Uri>
+    <ConfigurationMode>MinLatency</ConfigurationMode>
+    <Query><![CDATA[
+<QueryList>
+  <!-- The Security Event Log was cleared -->
+  <Query Id="0" Path="Security">
+    <Select Path="Security">*[System[(EventID=1102)]]</Select>
+  </Query>
+  
+  <!-- An event log was cleared -->
+  <Query Id="1" Path="System">
+    <Select Path="System">*[System[(EventID=104)]]</Select>
+  </Query>
+</QueryList>
+]]>
+    </Query>
+    <ReadExistingEvents>true</ReadExistingEvents>
+    <TransportName>HTTP</TransportName>
+    <ContentFormat>Events</ContentFormat>
+    <Locale Language="en-US"/>
+    <LogFile>ForwardedEvents</LogFile>
+    <PublisherName>Microsoft-Windows-EventCollector</PublisherName>
+    <AllowedSourceNonDomainComputers>
+        <AllowedIssuerCAList>
+        </AllowedIssuerCAList>
+    </AllowedSourceNonDomainComputers>
+    <AllowedSourceDomainComputers></AllowedSourceDomainComputers>
+</Subscription>

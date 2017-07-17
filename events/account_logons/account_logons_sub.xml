@@ -1,0 +1,90 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Subscription xmlns="http://schemas.microsoft.com/2006/03/windows/events/subscription">
+    <SubscriptionId>Account Logons</SubscriptionId>
+    <SubscriptionType>SourceInitiated</SubscriptionType>
+    <Description>Provides activity related to accounts logging in and out, including local and remote events.</Description>
+    <Enabled>true</Enabled>
+    <Uri>http://schemas.microsoft.com/wbem/wsman/1/windows/EventLog</Uri>
+    <ConfigurationMode>MinLatency</ConfigurationMode>
+    <Query><![CDATA[
+<QueryList>
+
+  <!-- Collect Logons. For more details including LogonType mappings see: https://docs.microsoft.com/en-us/windows/device-security/auditing/event-4624 -->
+  <Query Id="0" Path="Security">
+    <Select Path="Security">
+        *[System[(EventID=4624)]] and (
+            *[EventData[(Data[@Name='LogonType'] ='2')]] or
+            <!-- For remote logon events filter out Local System, Local Service and Network Service accounts -->
+            (*[EventData[(Data[@Name='LogonType'] ='3')]] and *[EventData[(Data[@Name='TargetUserSid']!='S-1-5-18')]] and *[EventData[(Data[@Name='TargetUserSid']!='S-1-5-19')]] and *[EventData[(Data[@Name!='TargetUserSid']!='S-1-5-20')]]) or
+            *[EventData[(Data[@Name='LogonType'] ='8')]] or
+            *[EventData[(Data[@Name='LogonType'] ='9')]] or
+            *[EventData[(Data[@Name='LogonType'] ='10')]] or
+            *[EventData[(Data[@Name='LogonType'] ='11')]]
+        )
+    </Select>
+    
+    <Suppress Path="Security">
+        *[EventData[(Data[@Name='TargetUserSid']='S-1-5-7')]] or <!-- Filter out anonymous logons -->
+        *[EventData[(Data[@Name='AuthenticationPackageName']='Kerberos')]] <!-- Filter Kerberos usage by default. This may miss activity but reduces noise significantly. -->
+    </Suppress>
+  </Query>
+  
+  <!-- Collect failed logons -->
+  <Query Id="1" Path="Security">
+    <Select Path="Security">
+        *[System[(EventID=4625)]]
+    </Select>
+    <Suppress Path="Security">
+        *[EventData[(Data[@Name='Status']='0xC0000133')]] <!-- filter out a time sync errors -->
+    </Suppress>
+  </Query>
+  
+  <!-- Collect account logoffs -->
+  <Query Id="2" Path="Security">
+    <Select Path="Security">
+        *[System[(EventID=4634)]] and (
+            *[EventData[(Data[@Name='LogonType'] ='2')]] or
+            <!-- Don't collect Network logoffs, since we cannot filter this effectively -->
+            *[EventData[(Data[@Name='LogonType'] ='8')]] or
+            *[EventData[(Data[@Name='LogonType'] ='9')]] or
+            *[EventData[(Data[@Name='LogonType'] ='10')]] or
+            *[EventData[(Data[@Name='LogonType'] ='11')]]
+        )
+    </Select>
+    <Suppress Path="Security">
+        *[EventData[(Data[@Name='TargetUserSid'] = 'S-1-5-18')]] or
+        *[EventData[(Data[@Name='TargetDomainName'] = 'Window Manager')]]
+    </Suppress>  
+  </Query>
+  
+  <!-- Collect use of explict credentials while filtering out common events -->
+  <Query Id="3" Path="Security">
+  <Select Path="Security">
+        *[System[(EventID=4648)]]
+    </Select>
+    <Suppress Path="Security">
+        <!-- Paths may need updating depending on configuration. -->
+        *[EventData[(Data[@Name='ProcessName'] = 'C:\Windows\System32\taskhost.exe')]] or
+        *[EventData[(Data[@Name='ProcessName'] = 'C:\Windows\System32\svchost.exe')]] or
+        *[EventData[(Data[@Name='ProcessName'] = 'C:\Windows\System32\lsass.exe')]] or
+        *[EventData[(Data[@Name='ProcessName'] = 'C:\Windows\System32\inetsrv\w3wp.exe.exe')]] or
+        *[EventData[(Data[@Name='ProcessName'] = 'C:\Windows\System32\winlogon.exe')]] or
+        *[EventData[(Data[@Name='ProcessName'] = 'C:\Windows\System32\services.exe')]]
+    </Suppress>
+  </Query>
+  
+</QueryList>
+]]>
+    </Query>
+    <ReadExistingEvents>true</ReadExistingEvents>
+    <TransportName>HTTP</TransportName>
+    <ContentFormat>Events</ContentFormat>
+    <Locale Language="en-US"/>
+    <LogFile>ForwardedEvents</LogFile>
+    <PublisherName>Microsoft-Windows-EventCollector</PublisherName>
+    <AllowedSourceNonDomainComputers>
+        <AllowedIssuerCAList>
+        </AllowedIssuerCAList>
+    </AllowedSourceNonDomainComputers>
+    <AllowedSourceDomainComputers></AllowedSourceDomainComputers>
+</Subscription>

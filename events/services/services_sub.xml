@@ -1,0 +1,39 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Subscription xmlns="http://schemas.microsoft.com/2006/03/windows/events/subscription">
+    <SubscriptionId>Services</SubscriptionId>
+    <SubscriptionType>SourceInitiated</SubscriptionType>
+    <Description>Provides information about changes to services on the system</Description>
+    <Enabled>true</Enabled>
+    <Uri>http://schemas.microsoft.com/wbem/wsman/1/windows/EventLog</Uri>
+    <ConfigurationMode>MinLatency</ConfigurationMode>
+    <Query><![CDATA[
+<QueryList>
+  <!-- Service Installation -->
+  <Query Id="0" Path="System">
+    <Select Path="System">*[System[(EventID=7045)]]</Select>
+  </Query>
+  
+  <!-- Service Installation from Audit System Security Extension. This event is more noisy and less useful than 7045, but if the audit option happens to be enabled, this event will be forwarded -->
+  <Query Id="1" Path="Security">
+      <Select Path="Security">*[System[(EventID=4697)]]</Select>
+  </Query>
+  
+  <!-- Event Log Service was shutdown -->
+  <Query Id="2" Path="Security">
+    <Select Path="Security">*[System[(EventID=1100)]]</Select>
+  </Query>
+</QueryList>
+]]>
+    </Query>
+    <ReadExistingEvents>true</ReadExistingEvents>
+    <TransportName>HTTP</TransportName>
+    <ContentFormat>Events</ContentFormat>
+    <Locale Language="en-US"/>
+    <LogFile>ForwardedEvents</LogFile>
+    <PublisherName>Microsoft-Windows-EventCollector</PublisherName>
+    <AllowedSourceNonDomainComputers>
+        <AllowedIssuerCAList>
+        </AllowedIssuerCAList>
+    </AllowedSourceNonDomainComputers>
+    <AllowedSourceDomainComputers></AllowedSourceDomainComputers>
+</Subscription>

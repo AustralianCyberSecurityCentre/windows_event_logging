@@ -1,0 +1,37 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Subscription xmlns="http://schemas.microsoft.com/2006/03/windows/events/subscription">
+    <SubscriptionId>WMI Auditing - Remote</SubscriptionId>
+    <SubscriptionType>SourceInitiated</SubscriptionType>
+    <Description>Records remote WMI activity</Description>
+    <Enabled>true</Enabled>
+    <Uri>http://schemas.microsoft.com/wbem/wsman/1/windows/EventLog</Uri>
+    <ConfigurationMode>MinLatency</ConfigurationMode>
+    <Query><![CDATA[
+    <!-- For access right constants see: https://msdn.microsoft.com/en-us/library/aa392710(v=vs.85).aspx -->
+<QueryList>
+  <Query Id="0" Path="Security">
+    <Select Path="Security">*[System[EventID=4662]] and *[EventData[Data[@Name='ObjectServer'] = 'WMI']] and *[EventData[band(Data[@Name='AccessMask'], 32)]]</Select> <!-- WBEM_REMOTE_ACCESS = 32 -->
+     <Suppress Path="Security">
+            <!-- Suppress common system activity -->
+            *[EventData[Data[@Name='AdditionalInfo2']='root\cimv2:Select * from __ClassProviderRegistration']] or
+            *[EventData[Data[@Name='AdditionalInfo2']='root\cimv2:references of {__Win32Provider.Name=&quot;CIMWin32&quot;}']] or
+            *[EventData[Data[@Name='AdditionalInfo2']='root\cimv2:references of {__Win32Provider.Name=&quot;WmiPerfClass&quot;}']] or
+            *[EventData[Data[@Name='AdditionalInfo2']='root\cimv2:__Win32Provider.Name=&quot;WmiPerfClass&quot;']] or
+            *[EventData[Data[@Name='AdditionalInfo2']='root\cimv2:__win32provider.name=&quot;cimwin32&quot;']]
+    </Suppress>
+  </Query>
+</QueryList>
+]]>
+    </Query>
+    <ReadExistingEvents>true</ReadExistingEvents>
+    <TransportName>HTTP</TransportName>
+    <ContentFormat>Events</ContentFormat>
+    <Locale Language="en-US"/>
+    <LogFile>ForwardedEvents</LogFile>
+    <PublisherName>Microsoft-Windows-EventCollector</PublisherName>
+    <AllowedSourceNonDomainComputers>
+       <AllowedIssuerCAList>
+        </AllowedIssuerCAList>
+    </AllowedSourceNonDomainComputers>
+    <AllowedSourceDomainComputers></AllowedSourceDomainComputers>
+</Subscription>

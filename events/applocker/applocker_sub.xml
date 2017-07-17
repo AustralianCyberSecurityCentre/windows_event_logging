@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Subscription xmlns="http://schemas.microsoft.com/2006/03/windows/events/subscription">
+    <SubscriptionId>AppLocker</SubscriptionId>
+    <SubscriptionType>SourceInitiated</SubscriptionType>
+    <Description>Provide visbility on programs blocked by application whitelisting</Description>
+    <Enabled>false</Enabled>
+    <Uri>http://schemas.microsoft.com/wbem/wsman/1/windows/EventLog</Uri>
+    <ConfigurationMode>MinLatency</ConfigurationMode>
+    <Query><![CDATA[
+<QueryList>
+  <!-- Applocker -->
+  <Query Id="0" Path="Microsoft-Windows-AppLocker/EXE and DLL">
+    <Select Path="Microsoft-Windows-AppLocker/EXE and DLL">*[System[(EventID=8003 or EventID=8004)]]</Select>
+  </Query>
+  
+  <Query Id="1" Path="Microsoft-Windows-AppLocker/MSI and Script">
+    <Select Path="Microsoft-Windows-AppLocker/MSI and Script">*[System[(EventID=8006 or EventID=8007)]]</Select>
+  </Query>
+  
+  <Query Id="2" Path="Microsoft-Windows-AppLocker/Packaged app-Deployment">
+    <Select Path="Microsoft-Windows-AppLocker/Packaged app-Deployment">*[System[(EventID=8024 or EventID=8025)]]</Select>
+  </Query>
+
+  <Query Id="3" Path="Microsoft-Windows-AppLocker/Packaged app-Execution">
+    <Select Path="Microsoft-Windows-AppLocker/Packaged app-Execution">*[System[(EventID=8021 or EventID=8022)]]</Select>
+  </Query>
+</QueryList>
+]]>
+    </Query>
+    <ReadExistingEvents>true</ReadExistingEvents>
+    <TransportName>HTTP</TransportName>
+    <ContentFormat>Events</ContentFormat>
+    <Locale Language="en-US"/>
+    <LogFile>ForwardedEvents</LogFile>
+    <PublisherName>Microsoft-Windows-EventCollector</PublisherName>
+    <AllowedSourceNonDomainComputers>
+        <AllowedIssuerCAList>
+        </AllowedIssuerCAList>
+    </AllowedSourceNonDomainComputers>
+    <AllowedSourceDomainComputers></AllowedSourceDomainComputers>
+</Subscription>

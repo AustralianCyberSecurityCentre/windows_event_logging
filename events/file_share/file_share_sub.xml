@@ -1,0 +1,54 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Subscription xmlns="http://schemas.microsoft.com/2006/03/windows/events/subscription">
+    <SubscriptionId>File Share</SubscriptionId>
+    <SubscriptionType>SourceInitiated</SubscriptionType>
+    <Description>Records creation, modification and access of file shares</Description>
+    <Enabled>true</Enabled>
+    <Uri>http://schemas.microsoft.com/wbem/wsman/1/windows/EventLog</Uri>
+    <ConfigurationMode>MinLatency</ConfigurationMode>
+    <Query><![CDATA[
+<QueryList>
+  <!-- Network share access -->
+  <Query Id="0" Path="Security">
+    <Select Path="Security">*[System[(EventID=5140)]]</Select>
+    <!--Suppress common network noise -->
+    <Suppress Path="Security">
+    *[EventData[Data[@Name='ShareName']='\\*\IPC$']] or <!-- IPC$ share access occurs frequently on a typical network -->
+    *[EventData[Data[@Name='ShareName']='\\*\SYSVOL']] <!-- Domain/Group policy share that often gets accessed -->
+    </Suppress>
+  </Query>
+  
+  <!-- Network share creation-->
+  <Query Id="1" Path="Security">
+    <Select Path="Security">*[System[(EventID=5142)]]</Select>
+    <!--Suppress common network noise -->
+    <Suppress Path="Security">
+    *[EventData[Data[@Name='ShareName']='\\*\IPC$']] or
+    (*[EventData[Data[@Name='ShareName']='\\*\C$']] and *[EventData[Data[@Name='ShareLocalPath']= '\??\C:\']]) or
+    (*[EventData[Data[@Name='ShareName']='\\*\D$']] and *[EventData[Data[@Name='ShareLocalPath']= '\??\D:\']]) or
+    (*[EventData[Data[@Name='ShareName']='\\*\E$']] and *[EventData[Data[@Name='ShareLocalPath']= '\??\E:\']]) or
+    *[EventData[Data[@Name='ShareName']='\\*\ADMIN$']] or
+    *[EventData[Data[@Name='ShareName']='\\*\print$']]
+    </Suppress>
+  </Query>
+  
+  <!-- Network share modification and deletion -->
+  <Query Id="2" Path="Security">
+    <Select Path="Security">*[System[(EventID=5143 or EventID=5144)]]</Select>
+  </Query>
+  
+</QueryList>
+]]>
+    </Query>
+    <ReadExistingEvents>true</ReadExistingEvents>
+    <TransportName>HTTP</TransportName>
+    <ContentFormat>Events</ContentFormat>
+    <Locale Language="en-US"/>
+    <LogFile>ForwardedEvents</LogFile>
+    <PublisherName>Microsoft-Windows-EventCollector</PublisherName>
+    <AllowedSourceNonDomainComputers>
+        <AllowedIssuerCAList>
+        </AllowedIssuerCAList>
+    </AllowedSourceNonDomainComputers>
+    <AllowedSourceDomainComputers></AllowedSourceDomainComputers>
+</Subscription>

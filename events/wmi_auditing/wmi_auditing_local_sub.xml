@@ -1,0 +1,132 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Subscription xmlns="http://schemas.microsoft.com/2006/03/windows/events/subscription">
+    <SubscriptionId>WMI Auditing - Local</SubscriptionId>
+    <SubscriptionType>SourceInitiated</SubscriptionType>
+    <Description>Records local WMI activity</Description>
+    <Enabled>false</Enabled>
+    <Uri>http://schemas.microsoft.com/wbem/wsman/1/windows/EventLog</Uri>
+    <ConfigurationMode>MinLatency</ConfigurationMode>
+    <Query><![CDATA[
+    <!-- 
+        For access right constants see: https://msdn.microsoft.com/en-us/library/aa392710(v=vs.85).aspx
+        For WMI permission's see:
+        https://blogs.msdn.microsoft.com/wmi/2009/07/20/scripting-wmi-namespace-security-part-1-of-3/
+        https://blogs.msdn.microsoft.com/wmi/2009/07/23/scripting-wmi-namespace-security-part-2-of-3/
+        https://blogs.msdn.microsoft.com/wmi/2009/07/27/scripting-wmi-namespace-security-part-3-of-3/
+    -->
+<QueryList>
+    <Query Id="0" Path="Security">
+        <!-- ROOT\CIMV2 ACLs:
+                - Everyone: Successful Execute, Edit Security
+                - Interactive, Network, Batch: Successful Read.
+        -->
+        <Select Path="Security">
+            *[System[EventID=4662]] and
+            *[EventData[Data[@Name='ObjectServer'] = 'WMI' and
+                        Data[@Name='ObjectName']='root\cimv2' and
+                        (Data[@Name='AdditionalInfo']='Local Read (ExecQuery)' or
+                        Data[@Name='AdditionalInfo']='Local Read (CreateInstanceEnum)' or
+                        Data[@Name='AdditionalInfo']='Local Execute (ExecMethod)' or
+                        Data[@Name='AdditionalInfo']='Local Read Security (GetSecurityDescriptor)' or
+                        Data[@Name='AdditionalInfo']='Local Write Security (SetSecurityDescriptor)' or
+                        Data[@Name='AdditionalInfo']='Local Write Security (SetSD)')]]
+        </Select>
+        <Suppress Path="Security">
+            <!-- Suppress remote access auditing since it's handled by wmi_remote_sub.xml - WBEM_REMOTE_ACCESS = 32. Limit to <20 OR statements. -->
+            *[EventData[band(Data[@Name='AccessMask'], 32)]] or
+            
+        <   !-- Suppress common system activity -->
+            *[EventData[Data[@Name='AdditionalInfo2']='root\cimv2:Select * from __ClassProviderRegistration']] or
+            *[EventData[Data[@Name='AdditionalInfo2']='root\cimv2:references of {__Win32Provider.Name=&quot;WmiPerfClass&quot;}']] or
+            *[EventData[Data[@Name='AdditionalInfo2']='root\cimv2:references of {__Win32Provider.Name=&quot;CIMWin32&quot;}']] or
+            *[EventData[Data[@Name='AdditionalInfo2']='root\cimv2:references of {__Win32Provider.Name=&quot;WBEMCORE&quot;}']] or
+            *[EventData[Data[@Name='AdditionalInfo2']='root\cimv2:Select __RELPATH from Win32_Process']] or 
+            *[EventData[Data[@Name='AdditionalInfo2']='root\cimv2:Select ChassisTypes from Win32_SystemEnclosure']]
+        </Suppress>
+    </Query>
+    
+    <Query Id="1" Path="Security">
+        <!-- ROOT\SECURITYCENTER AND ROOT\SECURITYCENTER2 ACLs:
+                - Everyone: Successful Read, Edit Security.
+        -->
+        <Select Path="Security">
+            *[System[EventID=4662]] and
+            *[EventData[Data[@Name='ObjectServer'] = 'WMI' and
+                        (Data[@Name='ObjectName']='root\SecurityCenter' or
+                        Data[@Name='ObjectName']='root\SecurityCenter2') and
+                        Data[@Name='SubjectUserSid']!='S-1-5-19' and
+                        (Data[@Name='AdditionalInfo']='Local Read (ExecQuery)' or
+                        Data[@Name='AdditionalInfo']='Local Read (ExecNotificationQuery)' or
+                        Data[@Name='AdditionalInfo']='Local Read (CreateInstanceEnum)' or
+                        Data[@Name='AdditionalInfo']='Local Read Security (GetSecurityDescriptor)' or
+                        Data[@Name='AdditionalInfo']='Local Write Security (SetSecurityDescriptor)' or
+                        Data[@Name='AdditionalInfo']='Local Write Security (SetSD)')]]
+        </Select>
+        <Suppress Path="Security">
+            <!-- Suppress remote access auditing since it's handled by wmi_remote_sub.xml - WBEM_REMOTE_ACCESS = 32 Limit to <20 OR statements.-->
+            *[EventData[band(Data[@Name='AccessMask'], 32)]] or
+            
+            <!-- Suppress common system activity -->
+            *[EventData[Data[@Name='AdditionalInfo2']='root\SecurityCenter:Select * from __ClassProviderRegistration']] or
+            *[EventData[Data[@Name='AdditionalInfo2']='root\SecurityCenter:Select * from __NAMESPACE']] or
+            *[EventData[Data[@Name='AdditionalInfo2']='root\SecurityCenter2:Select * from __ClassProviderRegistration']] or
+            *[EventData[Data[@Name='AdditionalInfo2']='root\SecurityCenter2:Select * from __NAMESPACE']]
+        </Suppress>
+    </Query>
+    
+    <Query Id="2" Path="Security">
+        <!-- ROOT\SUBSCRIPTION ACLs:
+                - Everyone: Successful Full Write, Partial Write, Provider Write, Edit Security.
+        -->
+        <Select Path="Security">
+            *[System[EventID=4662]] and *[EventData[Data[@Name='ObjectServer'] = 'WMI' and Data[@Name='ObjectName']='root\subscription']]
+        </Select>
+        <Suppress Path="Security">
+            <!-- Suppress remote access auditing since it's handled by wmi_remote_sub.xml - WBEM_REMOTE_ACCESS = 32 Limit to <20 OR statements.-->
+            *[EventData[band(Data[@Name='AccessMask'], 32)]]
+            
+            <!-- Suppress common system activity -->
+        </Suppress>
+    </Query>
+    
+    <Query Id="3" Path="Security">
+        <!-- ROOT\DEFAULT ACLs:
+                - Everyone: Successful Read, Execute, Full Write, Partial Write, Provider Write, Edit Security.
+        -->
+        <Select Path="Security">
+            *[System[EventID=4662]] and
+            *[EventData[Data[@Name='ObjectServer'] = 'WMI' and
+                        Data[@Name='ObjectName']='root\default' and
+                        (Data[@Name='AdditionalInfo']='Local Read (ExecQuery)' or
+                        Data[@Name='AdditionalInfo']='Local Read (ExecNotificationQuery)' or
+                        Data[@Name='AdditionalInfo']='Local Read (CreateInstanceEnum)' or
+                        Data[@Name='AdditionalInfo']='Local Read Security (GetSecurityDescriptor)' or
+                        Data[@Name='AdditionalInfo']='Local Execute (ExecMethod)' or
+                        Data[@Name='AdditionalInfo']='Local Write (PutInstance)' or
+                        Data[@Name='AdditionalInfo']='Local Write Security (SetSecurityDescriptor)' or
+                        Data[@Name='AdditionalInfo']='Local Write Security (SetSD)')]]
+        </Select>
+        <Suppress Path="Security">
+            <!-- Suppress remote access auditing since it's handled by wmi_remote_sub.xml - WBEM_REMOTE_ACCESS = 32 Limit to <20 OR statements.-->
+            *[EventData[band(Data[@Name='AccessMask'], 32)]] or
+            
+            <!-- Suppress common system activity -->
+            *[EventData[Data[@Name='AdditionalInfo2']='root\default:Select * from __ClassProviderRegistration']] or
+            *[EventData[Data[@Name='AdditionalInfo2']='root\default:Select * from __NAMESPACE']]
+        </Suppress>
+    </Query>
+</QueryList>
+]]>
+    </Query>
+    <ReadExistingEvents>true</ReadExistingEvents>
+    <TransportName>HTTP</TransportName>
+    <ContentFormat>Events</ContentFormat>
+    <Locale Language="en-US"/>
+    <LogFile>ForwardedEvents</LogFile>
+    <PublisherName>Microsoft-Windows-EventCollector</PublisherName>
+    <AllowedSourceNonDomainComputers>
+        <AllowedIssuerCAList>
+        </AllowedIssuerCAList>
+    </AllowedSourceNonDomainComputers>
+    <AllowedSourceDomainComputers></AllowedSourceDomainComputers>
+</Subscription>

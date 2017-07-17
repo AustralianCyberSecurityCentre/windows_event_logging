@@ -1,0 +1,53 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Subscription xmlns="http://schemas.microsoft.com/2006/03/windows/events/subscription">
+    <SubscriptionId>Windows Error Reporting</SubscriptionId>
+    <SubscriptionType>SourceInitiated</SubscriptionType>
+    <Description>Records when applications crash which could be indicative of exploitation</Description>
+    <Enabled>true</Enabled>
+    <Uri>http://schemas.microsoft.com/wbem/wsman/1/windows/EventLog</Uri>
+    <ConfigurationMode>MinLatency</ConfigurationMode>
+    <Query><![CDATA[
+<QueryList>
+  <!-- Catch application crashes
+    See http://social.technet.microsoft.com/wiki/contents/articles/3116.event-id-1001-windows-error-reporting.aspx for more details on error reporting.
+  -->
+  <Query Id="0" Path="Application">
+    <Select Path="Application">*[System[Provider[@Name='Windows Error Reporting'] and (EventID=1001 or EventID=1002)]]</Select>
+    <Suppress Path="Application">
+        *[EventData[Data[position()=3] = 'MpTelemetry'
+            or Data[position()=3] = 'AEAPPINV2'
+            or Data[position()=3] = 'AEAPPINVW8'             
+            or Data[position()=3] = 'WindowsUpdateFailure'
+            or Data[position()=3] = 'WindowsUpdateFailure2' 
+            or Data[position()=3] = 'WindowsUpdateFailure3' 
+            or Data[position()=3] = 'ScriptedDiagFailure'
+            or Data[position()=3] = 'NetworkDiagnosticsFrameworkV3'
+            or Data[position()=3] = 'ShellBrowserCancel'
+            or Data[position()=3] = 'VSSetup'
+            or Data[position()=3] = 'AppxDeploymentFailureBlue'
+            or Data[position()=3] = 'PnPDriverNotFound'
+            or Data[position()=3] = 'PnPGenericDriverFound'
+            or Data[position()=3] = 'RADAR_PRE_LEAK_64'
+            or Data[position()=3] = 'PDUWICA'
+            or Data[position()=3] = 'AppHangB1'
+            ]]
+    </Suppress>
+  </Query>
+  <Query Id="1" Path="Application">
+    <Select Path="Application">*[System[Provider[@Name='Windows Error Reporting'] and EventID=1000]]</Select>
+  </Query>
+</QueryList>
+]]>
+    </Query>
+    <ReadExistingEvents>true</ReadExistingEvents>
+    <TransportName>HTTP</TransportName>
+    <ContentFormat>Events</ContentFormat>
+    <Locale Language="en-US"/>
+    <LogFile>ForwardedEvents</LogFile>
+    <PublisherName>Microsoft-Windows-EventCollector</PublisherName>
+    <AllowedSourceNonDomainComputers>
+        <AllowedIssuerCAList>
+        </AllowedIssuerCAList>
+    </AllowedSourceNonDomainComputers>
+    <AllowedSourceDomainComputers></AllowedSourceDomainComputers>
+</Subscription>

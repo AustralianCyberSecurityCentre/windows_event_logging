@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Subscription xmlns="http://schemas.microsoft.com/2006/03/windows/events/subscription">
+    <SubscriptionId>Object Access Auditing</SubscriptionId>
+    <SubscriptionType>SourceInitiated</SubscriptionType>
+    <Description>Produces auditing of pre-existing Windows permissions of file paths, registry keys and processes</Description>
+    <Enabled>true</Enabled>
+    <Uri>http://schemas.microsoft.com/wbem/wsman/1/windows/EventLog</Uri>
+    <ConfigurationMode>MinLatency</ConfigurationMode>
+    <Query><![CDATA[
+<QueryList>
+  <!-- Audit access to processes (Usually only lsass.exe) -->
+  <Query Id="0" Path="Security">
+    <Select Path="Security">
+    
+    <!-- Permissions reference: https://msdn.microsoft.com/en-us/library/windows/desktop/ms684880%28v=vs.85%29.aspx -->
+    *[System[(EventID=4663)]] and *[EventData[Data[@Name='ObjectType'] = 'Process']] and
+    (
+        *[EventData[band(Data[@Name='AccessMask'], 42)]] or <!-- Select on PROCESS_CREATE_THREAD, PROCESS_VM_OPERATION and PROCESS_VM_WRITE -->
+        (            
+            *[EventData[Data[@Name='ProcessName'] != 'C:\Windows\System32\wbem\WmiPrvSE.exe']] and
+            *[EventData[Data[@Name='ProcessName'] != 'C:\Windows\System32\lsass.exe']] and
+            *[EventData[Data[@Name='ProcessName'] != 'C:\Windows\System32\csrss.exe']] and
+            
+            <!-- Path may need updating depending on configuration. -->
+            *[EventData[Data[@Name='ObjectName'] = '\Device\HarddiskVolume2\Windows\System32\lsass.exe']] and
+            *[EventData[band(Data[@Name='AccessMask'], 58)]])
+                <!-- Select on PROCESS_CREATE_THREAD, PROCESS_VM_OPERATION, PROCESS_VM_READ and PROCESS_VM_WRITE -->
+    )
+    
+    </Select>
+    <Suppress Path="Security">
+      <!-- This Windows process frequently modifies audit records -->
+      *[EventData[Data[@Name='ProcessName'] = 'C:\Windows\System32\poqexec.exe']]
+    </Suppress>
+  </Query>  
+  
+  
+  <!-- File or Registry Modification - Level of noise depends on audit records defined in SACLs -->
+  <!--  File permissions reference: https://msdn.microsoft.com/en-us/library/windows/desktop/gg258116%28v=vs.85%29.aspx
+        Registry permissions reference: https://msdn.microsoft.com/en-us/library/windows/desktop/ms724878(v=vs.85).aspx
+        Access mask reference: https://msdn.microsoft.com/en-us/library/windows/desktop/aa374892%28v=vs.85%29.aspx
+  -->
+  <Query Id="1" Path="Security">
+    <Select Path="Security">
+    
+    *[System[(EventID=4663)]] and
+     (
+        (*[EventData[Data[@Name='ObjectType'] = 'Key']] and 
+            *[EventData[band(Data[@Name='AccessMask'], 9240582)]] <!-- Select on KEY_CREATE_SUB_KEY, KEY_SET_VALUE, DELETE, WRITE_DAC, WRITE_OWNER, ACCESS_SYSTEM_SECURITY -->
+            ) or
+        (*[EventData[Data[@Name='ObjectType'] = 'File']] and
+            *[EventData[band(Data[@Name='AccessMask'], 9240646)]] <!-- Select on FILE_WRITE_DATA, FILE_APPEND_DATA, FILE_DELETE_CHILD, WRITE_DAC, WRITE_OWNER, ACCESS_SYSTEM_SECURITY, DELETE -->
+        )
+     )
+    
+    </Select>
+  
+    <!-- Too much data can be brought back by system accounts, so to reduce volume to a managable level filter the system accounts out -->
+    <Suppress Path="Security">
+      *[EventData[Data[@Name='SubjectUserSid']='S-1-5-18' or Data[@Name='SubjectUserSid']='S-1-5-19' or Data[@Name='SubjectUserSid']='S-1-5-20']]
+    </Suppress>
+  
+  </Query>
+  
+  <Query Id="2" Path="Security">
+    <Select Path="Security">
+      *[System[(EventID=4907)]] <!-- Audit settings on an object have been changed -->
+    </Select>
+    <Suppress Path="Security">
+      <!-- This Windows process frequently modifies audit records -->
+      *[EventData[Data[@Name='ProcessName'] = 'C:\Windows\System32\poqexec.exe']]
+    </Suppress>
+  </Query>
+  
+  <!-- Audit auditing changes
+    4719 = System audit policy was changed
+    4902 = The Per-user audit policy table was created
+    4908 = Special Groups Logon table modified
+    4912 = Per User Audit Policy was changed
+    4904 = An attempt was made to register a security event source
+    4905 = An attempt was made to unregister a security event source
+   -->
+  <Query Id="3" Path="Security">
+    <Select Path="Security">
+      *[System[(EventID=4719 or EventID=4902 or EventID=4908 or EventID=4912 or EventID=4904 or EventID=4905)]]
+    </Select>
+  </Query>
+  
+</QueryList>]]>
+    </Query>
+    <ReadExistingEvents>true</ReadExistingEvents>
+    <TransportName>HTTP</TransportName>
+    <ContentFormat>Events</ContentFormat>
+    <Locale Language="en-US"/>
+    <LogFile>ForwardedEvents</LogFile>
+    <PublisherName>Microsoft-Windows-EventCollector</PublisherName>
+    <AllowedSourceNonDomainComputers>
+        <AllowedIssuerCAList>
+        </AllowedIssuerCAList>
+    </AllowedSourceNonDomainComputers>
+    <AllowedSourceDomainComputers></AllowedSourceDomainComputers>
+</Subscription>
+
