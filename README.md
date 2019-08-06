@@ -1,6 +1,6 @@
 # ACSC's Windows Event Logging repository #
 
-This repository contains Windows Event Forwarding subscriptions, configuration files and scripts that are referenced by ACSC's protect publication, [Technical Guidance for Windows Event Logging](https://asd.gov.au/publications/protect/windows-event-logging-technical-guidance.htm).
+This repository contains Windows Event Forwarding subscriptions, configuration files and scripts that are referenced by ACSC's protect publication, [Technical Guidance for Windows Event Logging](https://www.cyber.gov.au/publications/windows-event-logging-and-forwarding).
 
 The repository is structured by having a matching folder per event category from the publication. This contains the subscriptions and as required other configuration files or scripts.
 
