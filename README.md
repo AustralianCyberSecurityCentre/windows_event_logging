@@ -1,8 +1,8 @@
 # ACSC's Windows Event Logging repository #
 
-This repository contains Windows Event Forwarding subscriptions, configuration files and scripts that are referenced by ACSC's protect publication, [Technical Guidance for Windows Event Logging](https://asd.gov.au/publications/protect/windows-event-logging-technical-guidance.htm).
+This repository contains Windows Event Forwarding subscriptions, configuration files and scripts that are referenced by ACSC's protect publication, [Technical Guidance for Windows Event Logging](https://www.cyber.gov.au/acsc/view-all-content/publications/windows-event-logging-and-forwarding).
 
-The repository is structured by having a matching folder per event category from the publication. This contains the subscriptions and as required other configuration files or scripts.
+The repository is structured with a matching folder per event category from the publication. This contains the subscriptions, and as required other configuration files or scripts.
 
 ### Subscriptions ###
 
@@ -22,15 +22,13 @@ Subscriptions in this repository are created with the following configuration:
 There are two small PowerShell scripts that simplify the process of adding subscriptions:
 
 * *events/add_subscriptions.ps1* - Adds all subscriptions. For each event category folder, it adds subscription files based on the _sub.xml naming.
-* *events/set_subscriptions_sources.ps1* - Sets all subscriptions to have the source computer groups of Domain Computers and Domain Controllers by default, or if the command line argument -SourceSDDL is specified then a custom [Security Descriptor Definition Language](https://msdn.microsoft.com/en-us/library/windows/desktop/aa379567.aspx) (SDDL).
+* *events/set_subscriptions_sources.ps1* - Sets all subscriptions to have the source computer groups of Domain Computers and Domain Controllers by default, or if the command line argument -SourceSDDL is specified then a custom [Security Descriptor Definition Language](https://docs.microsoft.com/en-us/windows/win32/secauthz/security-descriptor-definition-language) (SDDL).
 
 ### Sysmon ###
 
-[Sysmon](https://technet.microsoft.com/en-us/sysinternals/bb545021.aspx) provides greater visibility of system activity than standard Windows logging. The configuration file, subscriptions and an example MSI are included in *events/sysmon*.
+[Sysmon](https://docs.microsoft.com/en-us/sysinternals/downloads/sysmon) provides greater visibility of system activity than standard Windows logging. The sysmon configuration file and subscriptions are included in *events/sysmon*.
 
-The Sysmon configuration, *events/sysmon/sysmon_config.xml* should suit many different environments but may need to be tweaked in some cases. The file contains comments and links that may help in doing this.
-
-There are instructions contained within *events/sysmon/msi/README.txt* on how to build a Sysmon MSI, which may simplify the deployment of Sysmon. The resulting MSI should be tested before a domain-wide rollout.
+The Sysmon configuration, *events/sysmon/sysmon_config.xml* should suit many environments but may need to be modified to your use cases, or as new symon features and versions are released. The file contains comments and links that may help in doing this.
 
 ### WMI ###
 
