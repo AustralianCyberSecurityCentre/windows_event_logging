@@ -5,7 +5,7 @@ ABOUT:
 This sysmon configuration file should suit many common deployment scenarios.
 It aims to achieve a balance of capturing most potentially malicious events, while filtering noise.
 Whilst this configuration is tested, you must test bofore deployment to determine suitability for your environment.
-Version 2.0.3
+Version 2.0.4
 Tested on Sysmon 13.10, 13.20 & 13.21
 Minimum required Sysmon 13.10
 
@@ -549,7 +549,7 @@ REFERENCES:
         https://tyranidslair.blogspot.com.au/2017/05/exploiting-environment-variables-in.html -->
         <!-- This will capture System, and per user environment variables. -->
         <TargetObject condition="contains">\Environment\</TargetObject>
-        <TargetObject condition="contains">\Volatile Enviornment\</TargetObject>
+        <TargetObject condition="contains">\Volatile Environment\</TargetObject>
         <!-- Windows Update persistence mechanism from http://www.hexacorn.com/blog/2017/03/18/beyond-good-ol-run-key-part-60/ -->
         <TargetObject condition="contains">Microsoft\Windows\CurrentVersion\WindowsUpdate\Setup\ServiceStartup\</TargetObject>
         <!-- UAC bypass - sdclt.exe from https://enigma0x3.net/2017/03/14/bypassing-uac-using-app-paths/ -->
