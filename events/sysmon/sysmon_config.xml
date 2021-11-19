@@ -5,7 +5,7 @@ ABOUT:
 This sysmon configuration file should suit many common deployment scenarios.
 It aims to achieve a balance of capturing most potentially malicious events, while filtering noise.
 Whilst this configuration is tested, you must test bofore deployment to determine suitability for your environment.
-Version 2.0.2
+Version 2.0.3
 Tested on Sysmon 13.10, 13.20 & 13.21
 Minimum required Sysmon 13.10
 
@@ -27,10 +27,7 @@ This can be achieved by:
 REFERENCES:
 * This file is sourced from https://github.com/AustralianCyberSecurityCentre/windows_event_logging
 * Deployment https://www.cyber.gov.au/acsc/view-all-content/publications/windows-event-logging-and-forwarding
-* Sysmon main page https://technet.microsoft.com/en-au/sysinternals/sysmon
-* Presentations from Mark Russinovich on hunting hackers with Sysmon:
-   * https://onedrive.live.com/view.aspx?resid=D026B4699190F1E6!2575&ithint=file%2cpptx&authkey=!AGFBok7JLkOZSgE
-   * https://onedrive.live.com/view.aspx?resid=D026B4699190F1E6!2843&ithint=file%2cpptx&app=PowerPoint&authkey=!AMvCRTKB_V1J5ow
+* Sysmon main page https://docs.microsoft.com/en-us/sysinternals/downloads/sysmon
 -->
 
   <!-- Capture MD5, SHA256 and IMPHASH, to have both a backwards compatible, more secure hash and module import hashing -->
@@ -154,12 +151,16 @@ REFERENCES:
     </RuleGroup>
 
     <!-- Capture most remote thread creations apart from common system activity -->
-    <!-- Note: This will not capture QueueUserAPC method of thread injection (https://msdn.microsoft.com/en-us/library/windows/desktop/ms684954(v=vs.85).aspx) -->
+    <!-- Note: This will not capture QueueUserAPC method of thread injection 
+    https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-queueuserapc -->
     <RuleGroup name="CreateRemoteThread" groupRelation="or">
       <CreateRemoteThread onmatch="exclude">
-        <SourceImage condition="end with">:\Windows\System32\csrss.exe</SourceImage>        <!-- csrss.exe creates many remote threads on boot -->
-        <SourceImage condition="end with">:\Windows\System32\wbem\wmiprvse.exe</SourceImage>        <!-- creates many remote threads in some environments -->
-        <SourceImage condition="end with">:\ngen.exe</SourceImage>        <!-- creates many threads when .NET is updated -->
+        <!-- csrss.exe creates many remote threads on boot -->
+        <SourceImage condition="end with">:\Windows\System32\csrss.exe</SourceImage>
+        <!-- creates many remote threads in some environments -->     
+        <SourceImage condition="end with">:\Windows\System32\wbem\wmiprvse.exe</SourceImage>
+        <!-- creates many threads when .NET is updated -->
+        <SourceImage condition="end with">:\ngen.exe</SourceImage>
       </CreateRemoteThread>
     </RuleGroup>
 
@@ -180,12 +181,13 @@ REFERENCES:
     <RuleGroup name="ProcessAccess" groupRelation="or">
       <ProcessAccess onmatch="exclude">
         <!-- Filter out common access masks
-          A reference is available here for the mask: https://msdn.microsoft.com/en-us/library/windows/desktop/ms684880%28v=vs.85%29.aspx
+          A reference is available here for the mask: https://docs.microsoft.com/en-us/windows/win32/procthread/process-security-and-access-rights
           Ideally an access mask with any of the following is useful:
           PROCESS_VM_WRITE (0x0020)
           PROCESS_VM_READ (0x0010)
           PROCESS_VM_OPERATION (0x0008)
-          0x1410 (potential memory read) is common activity. E.g. by taskmgr.exe. We only want to capture this against lsass.exe and winlogon.exe, but this logic is in the subscription.
+          0x1410 (potential memory read) is common activity. E.g. by taskmgr.exe. 
+          We only want to capture this against lsass.exe and winlogon.exe, but this logic is in the subscription.
         -->
         <GrantedAccess condition="is">0x40</GrantedAccess>
         <GrantedAccess condition="is">0x101000</GrantedAccess>
@@ -212,8 +214,11 @@ REFERENCES:
       </ProcessAccess>
     </RuleGroup>
 
-    <!-- Match on potentially suspicious extensions based on https://technet.microsoft.com/en-us/library/cc179163(v=office.14).aspx and https://technet.microsoft.com/en-us/library/cc262496.aspx -->
-    <!-- This is not full proof but may give some visibility into the initial malicious activity. For example, after execution an attacker can create a file with any extension and rename it. -->
+    <!-- Match on file creation with potentially suspicious extensions based on 
+    https://docs.microsoft.com/en-us/previous-versions/office/office-2010/cc179163(v=office.14) 
+    and https://support.microsoft.com/en-us/office/types-of-files-that-cannot-be-added-to-a-list-or-library-30be234d-e551-4c2a-8de8-f8546ffbf5b3 -->
+    <!-- This is not full proof but may give some visibility into the initial malicious activity. 
+    For example, after execution an attacker can create a file with any extension and rename it. -->
     <RuleGroup name="FileCreate" groupRelation="or">
       <FileCreate onmatch="include">
         <!-- Archives -->
@@ -373,7 +378,8 @@ REFERENCES:
         <TargetFilename condition="contains">\INetCache\</TargetFilename>
         <TargetFilename condition="contains">:\Config.Msi</TargetFilename>
         <!-- Locations that commonly drop .js files -->
-        <TargetFilename condition="contains">AppData\Local\Microsoft\Windows\Temporary Internet Files\</TargetFilename>        <!-- Internet Explorer cache -->
+        <TargetFilename condition="contains">AppData\Local\Microsoft\Windows\Temporary Internet Files\</TargetFilename>
+        <!-- Internet Explorer cache -->
         <!-- These binaries frequently create DLL files -->
         <Image condition="end with">:\Windows\System32\cleanmgr.exe</Image>
         <Image condition="end with">:\Windows\System32\svchost.exe</Image>
@@ -390,7 +396,8 @@ REFERENCES:
         <!-- Mozilla -->
         <Image condition="end with">\Mozilla Maintenance Service\update\updater.exe</Image>
         <Image condition="end with">\Mozilla Maintenance Service\maintenanceservice.exe</Image>
-        <TargetFilename condition="end with">.default\prefs-1.js</TargetFilename>        <!-- Mozilla preferences -->
+        <!-- Mozilla preferences -->
+        <TargetFilename condition="end with">.default\prefs-1.js</TargetFilename>
         <!-- Chrome -->
         <Image condition="end with">\Google\Update\GoogleUpdate.exe</Image>
         <TargetFilename condition="contains">\CRX_INSTALL\</TargetFilename>
@@ -401,10 +408,12 @@ REFERENCES:
     </RuleGroup>
 
     <!--
-      Capture registry events including many of the known registry persistence locations, some other sensitive locations, and capture IP address changes to assist with correlation
+      Capture registry events including many of the known registry persistence locations, 
+      some other sensitive locations, and capture IP address changes to assist with correlation
       Sysmon's output paths are now 'friendly names' as of version 6. E.g. HKLM, and HKEY_USERS\[SID]
       Note: Sysmon will match against all ControlSet paths. E.g. by setting a key under ControlSet001, the filter will still catch this.
-      Note: A potential bypass is by renaming a key, e.g. from Microsoft\Windows\CurrentVersion\New to Microsoft\Windows\CurrentVersion\Run. The current filter schema (as of Sysmon 5.02) doesn't allow filtering by NewName, so these events get missed.
+      Note: A potential bypass is by renaming a key, e.g. from Microsoft\Windows\CurrentVersion\New to Microsoft\Windows\CurrentVersion\Run. 
+      The current filter schema (as of Sysmon 5.02) doesn't allow filtering by NewName, so these events get missed.
      -->
     <RuleGroup name="RegistryEvent" groupRelation="or">
       <RegistryEvent onmatch="include">
@@ -471,7 +480,8 @@ REFERENCES:
         <TargetObject condition="contains">Microsoft\Internet Explorer\Toolbar</TargetObject>
         <TargetObject condition="contains">Microsoft\Internet Explorer\Explorer Bars</TargetObject>
         <TargetObject condition="contains">Microsoft\Internet Explorer\Extensions</TargetObject>
-        <!-- Monitor ImagePath, ServiceDll which are important service keys to audit. This allows for tracking changes to services with a managable noise level. -->
+        <!-- Monitor ImagePath, ServiceDll which are important service keys to audit. 
+        This allows for tracking changes to services with a managable noise level. -->
         <TargetObject condition="end with">\ServiceDll</TargetObject>
         <TargetObject condition="end with">\ImagePath</TargetObject>
         <!-- Monitor changes to protected process registry keys for services and lsass -->
@@ -535,7 +545,8 @@ REFERENCES:
         <TargetObject condition="contains">Microsoft\Windows\CurrentVersion\Explorer\Shell Extensions</TargetObject>
         <TargetObject condition="contains">Microsoft\Windows\CurrentVersion\AeDebug</TargetObject>
         <TargetObject condition="contains">Microsoft\Windows\CurrentVersion\SystemRestore</TargetObject>
-        <!-- UAC bypass technique using environment variables and scheduled tasks: https://tyranidslair.blogspot.com.au/2017/05/exploiting-environment-variables-in.html -->
+        <!-- UAC bypass technique using environment variables and scheduled tasks: 
+        https://tyranidslair.blogspot.com.au/2017/05/exploiting-environment-variables-in.html -->
         <!-- This will capture System, and per user environment variables. -->
         <TargetObject condition="contains">\Environment\</TargetObject>
         <TargetObject condition="contains">\Volatile Enviornment\</TargetObject>
@@ -550,12 +561,23 @@ REFERENCES:
         <TargetObject condition="contains">Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\InstalledSDB</TargetObject>
         <!--
          Audit changes to IP addresses in the registry. This will help with correlation of events using IP addresses.
-         See https://msdn.microsoft.com/en-us/library/dn167252.aspx for more details.
+         See https://docs.microsoft.com/en-us/previous-versions/windows/embedded/dn167252(v=winembedded.80)for more details.
         -->
         <TargetObject condition="end with">DhcpIPAddress</TargetObject>
         <TargetObject condition="end with">DhcpIPv6Address</TargetObject>
-        <!-- Monitor changes to WDigest, which could allow for plaintext credentials to be stored - https://www.trustedsec.com/blog/dumping-wdigest-creds-with-meterpreter-mimikatzkiwi-in-windows-8-1/ -->
+        <!-- Monitor changes to WDigest, which could allow for plaintext credentials to be stored
+         https://www.trustedsec.com/blog/dumping-wdigest-creds-with-meterpreter-mimikatzkiwi-in-windows-8-1/ -->
         <TargetObject condition="contains">CurrentControlSet\Control\SecurityProviders\WDigest</TargetObject>
+        <!-- Monitor the Print Spooler adding a new printer driver
+         https://www.splunk.com/en_us/blog/security/i-pity-the-spool-detecting-printnightmare-cve-2021-34527.html  -->
+        <Rule groupRelation="and">
+        <TargetObject condition="begin with">HKLM\SYSTEM\CurrentControlSet\Control\Print\Environments\Windows x64\Drivers</TargetObject>
+        <TargetObject condition="end with">Data File</TargetObject>
+        </Rule>
+        <Rule groupRelation="and">
+        <TargetObject condition="begin with">HKLM\SYSTEM\CurrentControlSet\Control\Print\Environments\Windows x64\Drivers</TargetObject>
+        <TargetObject condition="end with">Configuration File</TargetObject>
+        </Rule>
       </RegistryEvent>
     </RuleGroup>
 
@@ -626,7 +648,8 @@ REFERENCES:
       Include suspicious file deletion events
       MITRE ATT&CK Indicator Removal on Host:File Deletion T11070.004
       This may give visibilty into adversaries removing evidence of compromise.
-      For example, after an actor has successfully exfiltrated an archive, they may delete the archive in an attempt to hide evidence.
+      For example, after an actor has successfully exfiltrated an archive, 
+      they may delete the archive in an attempt to hide evidence.
     -->
     <RuleGroup name="FileDeleteDetected" groupRelation="or">
       <FileDeleteDetected onmatch="include">
