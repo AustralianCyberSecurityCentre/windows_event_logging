@@ -67,7 +67,7 @@
         *[EventData[(Data[@Name='ProcessName'] = 'C:\Windows\System32\taskhost.exe')]] or
         *[EventData[(Data[@Name='ProcessName'] = 'C:\Windows\System32\svchost.exe')]] or
         *[EventData[(Data[@Name='ProcessName'] = 'C:\Windows\System32\lsass.exe')]] or
-        *[EventData[(Data[@Name='ProcessName'] = 'C:\Windows\System32\inetsrv\w3wp.exe.exe')]] or
+        *[EventData[(Data[@Name='ProcessName'] = 'C:\Windows\System32\inetsrv\w3wp.exe')]] or
         *[EventData[(Data[@Name='ProcessName'] = 'C:\Windows\System32\winlogon.exe')]] or
         *[EventData[(Data[@Name='ProcessName'] = 'C:\Windows\System32\services.exe')]]
     </Suppress>
