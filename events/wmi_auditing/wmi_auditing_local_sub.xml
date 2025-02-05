@@ -35,7 +35,7 @@
             <!-- Suppress remote access auditing since it's handled by wmi_remote_sub.xml - WBEM_REMOTE_ACCESS = 32. Limit to <20 OR statements. -->
             *[EventData[band(Data[@Name='AccessMask'], 32)]] or
             
-        <   !-- Suppress common system activity -->
+        <!-- Suppress common system activity -->
             *[EventData[Data[@Name='AdditionalInfo2']='root\cimv2:Select * from __ClassProviderRegistration']] or
             *[EventData[Data[@Name='AdditionalInfo2']='root\cimv2:references of {__Win32Provider.Name=&quot;WmiPerfClass&quot;}']] or
             *[EventData[Data[@Name='AdditionalInfo2']='root\cimv2:references of {__Win32Provider.Name=&quot;CIMWin32&quot;}']] or
